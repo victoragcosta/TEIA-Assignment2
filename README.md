@@ -12,11 +12,12 @@ Matrícula | Nome
 ## Ferramentas Utilizadas
 * Utilizou-se Python versão 3.7
 
-Biblioteca   | Versão
--------------|--------
-python-mnist | 0.6
-numpy        | 1.16.2
-matplotlib   | 3.0.3
+Biblioteca   | Versão | Instalação
+-------------|--------|----------------------------
+python-mnist | 0.6    | `pip install python-mnist`
+numpy        | 1.16.2 | `pip install numpy`
+matplotlib   | 3.0.3  | `pip install matplotlib`
+Theano       | 1.0.4  | `pip install Theano`
 
 ## Modo de Uso
 1. Navegue até o diretório raiz do projeto
