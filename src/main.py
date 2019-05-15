@@ -10,11 +10,11 @@ from multilayer_perceptron import *
 # Padrão X -> imagens ; Y -> labels
 
 # Extração de dados (biblioteca python-mnist)
-mndata = MNIST(os.path.abspath('data'))
-X, Y = mndata.load_training()
+mnist_data = MNIST(os.path.abspath('data'))
+X, Y = mnist_data.load_training()
 X_training = np.reshape(np.asarray(X, dtype=np.uint8), (60000, 28, 28))
 Y_training = np.reshape(np.asarray(Y, dtype=np.uint8), (60000,))
-X, Y = mndata.load_testing()
+X, Y = mnist_data.load_testing()
 X_test = np.reshape(np.asarray(X, dtype=np.uint8), (10000, 28, 28))
 Y_test = np.reshape(np.asarray(Y, dtype=np.uint8), (10000,))
 
