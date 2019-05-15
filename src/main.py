@@ -5,7 +5,7 @@ import theano.tensor as T
 import matplotlib.pyplot as plt
 import os.path
 
-from multilayer_perceptron import *
+from src.multilayer_perceptron import *
 
 # Padrão X -> imagens ; Y -> labels
 
