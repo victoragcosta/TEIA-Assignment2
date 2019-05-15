@@ -1,77 +1,100 @@
 import numpy as np
+from functools import reduce
 import theano
 import theano.tensor as T
 import matplotlib.pyplot as plt
 
-class HiddenLayer:
+from logistic_regression_layer import *
+from hidden_layer import *
 
-    def __init__(self, layer_input, n_in, n_out, random_generator, W=None, b=None, activation=T.tanh, name=None):
-        '''Cria uma camada escondida genérica
+class MultilayerPerceptron:
 
-        :type layer_input: theano.tensor.TensorType
-        :param layer_input: variável que representa a entrada da camada
+    def __init__(self, structure, classifier_input, random_generator):
+        """ Cria uma rede neural completa baseada nos parâmetros de estrutura
 
-        :type n_in: int
-        :param n_in: quantidade de entradas da camada
+        :type structure: tuple
+        :param structure: tupla contendo quantos neurônios por camada, incluindo a entrada
 
-        :type n_out: int
-        :param n_out: quantidade de neurônios e saídas da camada
+        :type classifier_input: theano.tensor.TensorType
+        :param classifier_input: variável simbólica que representa a entrada do
+                                 classificador
 
         :type random_generator: numpy.random.RandomState
         :param random_generator: um gerador de números aleatórios para criar
                                  a matriz de pesos iniciais
 
-        :type activation: theano.Op or function
-        :param activation: função de ativação não linear
+        """
 
-        '''
-
-        self.layer_input = layer_input
-
-        # Initialize with random values the weights W as a matrix of shape (n_in, n_out)
-        if W is None:
-            W_values = np.asarray(
-                random_generator.uniform(
-                    low=-6/(n_in+n_out),
-                    high=6/(n_in+n_out),
-                    size=(n_in, n_out)
-                ),
-                dtype=theano.config.floatX
+        # Start list of layers
+        self.layers = []
+        # The first input is the classifier input
+        layer_input = classifier_input
+        # Creates pairs of before and after layers neurons counts
+        pairs = zip(structure[:-2],structure[1:-1])
+        # Creates all but the last layer
+        for count, (layer_count, next_layer_count) in enumerate(pairs):
+            print(count, '(', layer_count, ',', next_layer_count, ')')
+            # Creates a layer with the input as the output of the last layer
+            new_layer = HiddenLayer(
+                layer_input=layer_input,
+                n_in=layer_count,
+                n_out=next_layer_count,
+                random_generator=random_generator,
+                name=count
             )
+            # Save in the layers list
+            self.layers.append(new_layer)
+            # Sets the new input to be the last output
+            layer_input = new_layer.output
 
-            # Allocates weight matrix in theano
-            W = theano.shared(
-                value=W_values,
-                name='W' if name is None else 'W{}'.format(name),
-                borrow=True
+        # Add the last layer, that is logistical
+        new_layer = LogisticRegressionLayer(
+            layer_input=layer_input,
+            n_in=structure[-2],
+            n_out=structure[-1]
+        )
+        self.layers.append(new_layer)
+        self.output = new_layer.output
+        self.y_pred = T.argmax(self.output, axis=1)
+
+        self.L1 = reduce(
+            lambda a, b: a+b,
+            map(
+                lambda layer: abs(layer.W).sum(),
+                self.layers
             )
+        )
 
-        # Initialize the biases b as a vector of n_out 0s
-        if b is None:
-            b_values = np.zeros(
-                (n_out,),
-                dtype=theano.config.floatX
+        self.L2_sqr = reduce(
+            lambda a, b: a+b,
+            map(
+                lambda layer: (layer.W ** 2).sum(),
+                self.layers
             )
+        )
 
-            # Allocates biases vector in theano
-            b = theano.shared(
-                value=b_values,
-                name='b' if name is None else 'b{}'.format(name),
-                borrow=True
+        self.params = reduce(lambda a,b: a+b, map(lambda l: l.params, self.layers))
+
+    def negative_log_likelihood(self, y):
+        return -T.mean(T.log(self.output)[T.arange(y.shape[0]), y])
+
+    def errors(self, y):
+        """ Retorna um float representando a porcentagem de erros da minibatela
+
+        :type y: theano.tensor.TensorType
+        :param y: saídas esperadas para cada minibatela
+        """
+
+        # check if y has same dimension of y_pred
+        if y.ndim != self.y_pred.ndim:
+            raise TypeError(
+                'y deve ter a mesma forma que self.y_pred',
+                ('y', y.type, 'y_pred', self.y_pred.type)
             )
-
-        self.W = W
-        self.b = b
-
-        # Tells theano how to calculate the linear output (before activation function)
-        lin_output = T.dot(layer_input, self.W) + self.b
-        # Tells theano how to calculate output (activation function applied
-        # on linear output)
-        self.output = lin_output if activation is None else activation(lin_output)
-        self.params = [self.W, self.b]
-
-
-
-class MultilayerPerceptron:
-    def __init__(self):
-        pass
+        # check if y is of the correct datatype
+        if y.dtype.startswith('int'):
+            # the T.neq operator returns a vector of 0s and 1s, where 1
+            # represents a mistake in prediction
+            return T.mean(T.neq(self.y_pred, y))
+        else:
+            raise NotImplementedError()
