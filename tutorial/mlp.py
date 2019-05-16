@@ -69,7 +69,7 @@ class HiddenLayer(object):
         self.input = input
         # end-snippet-1
 
-        # `W` is initialized with `W_values` which is uniformely sampled
+        # `W` is initialized with `W_values` which is uniformly sampled
         # from sqrt(-6./(n_in+n_hidden)) and sqrt(6./(n_in+n_hidden))
         # for tanh activation function
         # the output of uniform if converted using asarray to dtype

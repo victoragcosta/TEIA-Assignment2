@@ -9,7 +9,7 @@ from hidden_layer import *
 
 class MultilayerPerceptron:
 
-    def __init__(self, structure, classifier_input, random_generator):
+    def __init__(self, structure, classifier_input, random_generator, last_logistic=True):
         """ Cria uma rede neural completa baseada nos parâmetros de estrutura
 
         :type structure: tuple
@@ -30,10 +30,13 @@ class MultilayerPerceptron:
         # The first input is the classifier input
         layer_input = classifier_input
         # Creates pairs of before and after layers neurons counts
-        pairs = zip(structure[:-2],structure[1:-1])
+        if last_logistic:
+            pairs = zip(structure[:-2],structure[1:-1])
+        else:
+            pairs = zip(structure[:-1],structure[1:])
         # Creates all but the last layer
         for count, (layer_count, next_layer_count) in enumerate(pairs):
-            print(count, '(', layer_count, ',', next_layer_count, ')')
+            #print(count, '(', layer_count, ',', next_layer_count, ')')
             # Creates a layer with the input as the output of the last layer
             new_layer = HiddenLayer(
                 layer_input=layer_input,
@@ -48,14 +51,15 @@ class MultilayerPerceptron:
             layer_input = new_layer.output
 
         # Add the last layer, that is logistical
-        new_layer = LogisticRegressionLayer(
-            layer_input=layer_input,
-            n_in=structure[-2],
-            n_out=structure[-1]
-        )
-        self.layers.append(new_layer)
+        if last_logistic:
+            new_layer = LogisticRegressionLayer(
+                layer_input=layer_input,
+                n_in=structure[-2],
+                n_out=structure[-1]
+            )
+            self.layers.append(new_layer)
         self.output = new_layer.output
-        self.y_pred = T.argmax(self.output, axis=1)
+        self.y_prediction = T.argmax(self.output, axis=1)
 
         self.L1 = reduce(
             lambda a, b: a+b,
@@ -85,16 +89,16 @@ class MultilayerPerceptron:
         :param y: saídas esperadas para cada minibatela
         """
 
-        # check if y has same dimension of y_pred
-        if y.ndim != self.y_pred.ndim:
+        # check if y has same dimension of y_prediction
+        if y.ndim != self.y_prediction.ndim:
             raise TypeError(
-                'y deve ter a mesma forma que self.y_pred',
-                ('y', y.type, 'y_pred', self.y_pred.type)
+                'y deve ter a mesma forma que self.y_prediction',
+                ('y', y.type, 'y_prediction', self.y_prediction.type)
             )
         # check if y is of the correct datatype
         if y.dtype.startswith('int'):
             # the T.neq operator returns a vector of 0s and 1s, where 1
             # represents a mistake in prediction
-            return T.mean(T.neq(self.y_pred, y))
+            return T.mean(T.neq(self.y_prediction, y))
         else:
             raise NotImplementedError()
