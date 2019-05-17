@@ -76,11 +76,13 @@ class MultilayerPerceptron:
                 self.layers
             )
         )
-
         self.params = reduce(lambda a,b: a+b, map(lambda l: l.params, self.layers))
 
     def negative_log_likelihood(self, y):
         return -T.mean(T.log(self.output)[T.arange(y.shape[0]), y])
+
+    def mean_squared_error(self, y):
+        return T.mean(T.sqr(y-self.output[T.arange(y.shape[0]), y]))
 
     def errors(self, y):
         """ Retorna um float representando a porcentagem de erros da minibatela

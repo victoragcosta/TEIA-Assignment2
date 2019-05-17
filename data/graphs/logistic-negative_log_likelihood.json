@@ -1,0 +1,36 @@
+{
+    "structure": [
+        784,
+        500,
+        100,
+        10
+    ],
+    "last_logistic": true,
+    "cost_function": "negative_log_likelihood",
+    "early_stopping": true,
+    "test_loss_best": 0.0974,
+    "valid_loss_graph": [
+        [
+            1,
+            0.10500000000000001
+        ]
+    ],
+    "test_loss_graph": [
+        [
+            1,
+            0.0974
+        ]
+    ],
+    "valid_precision_graph": [
+        [
+            1,
+            0.8962561384490417
+        ]
+    ],
+    "test_precision_graph": [
+        [
+            1,
+            0.9022296864751584
+        ]
+    ]
+}

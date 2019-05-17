@@ -6,12 +6,13 @@ import matplotlib.pyplot as plt
 import timeit
 import json
 from decimal import Decimal
+from sklearn.metrics import classification_report, precision_score
 
 from multilayer_perceptron import *
 
 class MultilayerPerceptronClassifier:
 
-    def __init__(self, structure, seed=1234, learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000, batch_size=20, last_logistic=True):
+    def __init__(self, structure, seed=1234, learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000, batch_size=20, last_logistic=False, cost_function=None, early_stopping=False):
         """ Constrói modelo e treina o modelo
 
         :type structure: tuple
@@ -37,6 +38,18 @@ class MultilayerPerceptronClassifier:
         :param batch_size: quantos exemplos devem ser mostrados à rede antes de ser
                            realizada a backpropagation
 
+        :type last_logistic: bool
+        :param last_logistic: se verdadeiro, a última camada soltará probabilidades de ser
+                              cada classe
+
+        :type cost_function: str or None
+        :param cost_function: indica que função de custo usar para o backpropagation e
+                              métricas. {'negative_log_likelihood', None}
+
+        :type early_stopping: bool
+        :param early_stopping: determina se deve parar o treinamento antes de completar
+                               todas as épocas caso não haja melhora significativa
+
         """
         # Save parameters
         self.structure = structure
@@ -46,10 +59,15 @@ class MultilayerPerceptronClassifier:
         self.L2_reg = L2_reg
         self.n_epochs = n_epochs
         self.batch_size = batch_size
+        self.last_logistic = last_logistic
+        self.cost_function = cost_function
+        self.early_stopping = early_stopping
 
         # To help create statistics
         self.valid_loss_graph = []
         self.test_loss_graph = []
+        self.valid_precision_graph = []
+        self.test_precision_graph = []
 
         # Creates an index for easy control
         self.index = T.lscalar()
@@ -65,11 +83,18 @@ class MultilayerPerceptronClassifier:
             last_logistic=last_logistic
         )
 
-        self.cost = (
-            self.classifier.negative_log_likelihood(self.y)
-            + L1_reg * self.classifier.L1
-            + L2_reg * self.classifier.L2_sqr
-        )
+        if cost_function is None:
+            self.cost = (
+                self.classifier.mean_squared_error(self.y)
+                + L1_reg * self.classifier.L1
+                + L2_reg * self.classifier.L2_sqr
+            )
+        elif cost_function == 'negative_log_likelihood':
+            self.cost = (
+                self.classifier.negative_log_likelihood(self.y)
+                + L1_reg * self.classifier.L1
+                + L2_reg * self.classifier.L2_sqr
+            )
 
         # Calculates the gradient for the parameters
         self.gparams = [T.grad(self.cost, param) for param in self.classifier.params]
@@ -164,7 +189,7 @@ class MultilayerPerceptronClassifier:
             for minibatch_index in range(n_train_batches):
 
                 minibatch_avg_cost = self.train_model(minibatch_index)
-                iteration = (epoch - 1) * n_train_batches + minibatch_index # number of minibatches iterated
+                iteration = (epoch - 1) * n_train_batches + minibatch_index # total number of minibatches iterated
 
                 # Tests if it is time to validate
                 if (iteration + 1) % validation_frequency == 0:
@@ -174,26 +199,33 @@ class MultilayerPerceptronClassifier:
                         for i in range(n_valid_batches)
                     ]
                     this_validation_loss = np.mean(validation_losses)
-
                     self.valid_loss_graph.append((epoch, this_validation_loss))
 
+                    this_validation_precision = self.precision_avg(valid[0],valid[1])
+                    self.valid_precision_graph.append((
+                        epoch,
+                        this_validation_precision
+                    ))
+
                     print(
-                        'epoch {0}, minibatch {1}/{2}, validation error {3:.2f}%'.format(
+                        'epoch {0}, minibatch {1}/{2}, validation error {3:.2f}%, validation precision {4:.2f}'.format(
                             epoch,
                             minibatch_index + 1,
                             n_train_batches,
-                            this_validation_loss * 100.
+                            this_validation_loss * 100.,
+                            this_validation_precision * 100.
                         )
                     )
+
 
                     # if we got the best validation score until now
                     if this_validation_loss < best_validation_loss:
                         # improve patience if loss improvement is good enough
-                        # if (
-                        #     this_validation_loss < best_validation_loss *
-                        #     improvement_threshold
-                        # ):
-                        #     patience = max(patience, iteration * patience_increase)
+                        if (
+                            (this_validation_loss < best_validation_loss *
+                            improvement_threshold) and self.early_stopping
+                        ):
+                            patience = max(patience, iteration * patience_increase)
 
                         self.save_snapshot()
 
@@ -206,21 +238,27 @@ class MultilayerPerceptronClassifier:
                             for i in range(n_test_batches)
                         ]
                         test_score = np.mean(test_losses)
-
                         self.test_loss_graph.append((epoch, test_score))
 
+                        this_test_precision = self.precision_avg(test[0],test[1])
+                        self.test_precision_graph.append((
+                            epoch,
+                            this_test_precision
+                        ))
+
                         print(
-                            '     epoch {0}, minibatch {1}/{2}, test error of best model {3}%'.format(
+                            '     epoch {0}, minibatch {1}/{2}, test error of best model {3}%, precision {4}'.format(
                                 epoch,
                                 minibatch_index + 1,
                                 n_train_batches,
-                                test_score * 100.
+                                test_score * 100.,
+                                this_test_precision * 100.
                             )
                         )
 
-                # if patience <= iteration:
-                #     done_looping = True
-                #     break
+                if patience <= iteration and self.early_stopping:
+                    done_looping = True
+                    break
 
         end_time = timeit.default_timer()
         print(
@@ -232,8 +270,23 @@ class MultilayerPerceptronClassifier:
             )
         )
         print('The model ran for {0:.2f} minutes'.format((end_time - start_time) / 60.))
+
+        test_losses = [
+            self.test_model(i)
+            for i in range(n_test_batches)
+        ]
+        test_score = np.mean(test_losses)
+
         self.best_validation_loss = best_validation_loss
         self.load_snapshot() # Reloads the best classifier
+        self.test_loss_best = test_score
+
+    def predict(self, x):
+        predict_theano = theano.function(
+            inputs=[self.x],
+            outputs=self.classifier.y_prediction
+        )
+        return predict_theano(x)
 
     def save_snapshot(self):
         self.snapshot = []
@@ -254,9 +307,13 @@ class MultilayerPerceptronClassifier:
 
         assert filename.split('.')[-1].lower() == 'json'
 
-        data = {}
-        data['structure'] = self.structure
-        data['layers'] = []
+        data = {
+            "structure": self.structure,
+            "last_logistic": self.last_logistic,
+            "cost_function": self.cost_function,
+            "early_stopping":self.early_stopping,
+            "layers": []
+        }
         pairs = zip(self.classifier.params[0::2], self.classifier.params[1::2])
         for count, (W, b) in enumerate(pairs):
             data['layers'].append(
@@ -287,6 +344,9 @@ class MultilayerPerceptronClassifier:
         f.close()
 
         assert self.structure == tuple(data['structure'])
+        assert self.last_logistic == data['last_logistic']
+        assert self.cost_function == data['cost_function']
+        assert self.early_stopping == data['early_stopping']
 
         self.snapshot = []
         for layer in data['layers']:
@@ -295,3 +355,43 @@ class MultilayerPerceptronClassifier:
             self.snapshot.append(np.asarray(weights['b'], dtype=theano.config.floatX))
 
         self.load_snapshot()
+
+    def save_graphs(self, filename):
+        data = {
+            "structure":self.structure,
+            "last_logistic":self.last_logistic,
+            "cost_function":self.cost_function,
+            "early_stopping":self.early_stopping,
+            "test_loss_best":self.test_loss_best,
+            "valid_loss_graph": self.valid_loss_graph,
+            "test_loss_graph": self.test_loss_graph,
+            "valid_precision_graph":self.valid_precision_graph,
+            "test_precision_graph":self.test_precision_graph,
+        }
+        f = open(filename, "w")
+        json.dump(data, f, ensure_ascii=False, indent=4)
+        f.close()
+
+    def precision_avg(self, x, y):
+        precision = precision_score(
+            y_true=y,
+            y_pred=self.predict(x),
+            labels=list(range(10)),
+            average='macro'
+        )
+        return precision
+
+    def precision_per_label(self, x, y):
+        aux = classification_report(
+            # Use the numpy array of the labels
+            y_true=y,
+            # Use the numpy array of the pixels
+            y_pred=self.predict(x),
+            labels=list(range(10)),
+            output_dict=True
+        )
+        precision = {}
+        for label, data in aux.items():
+            if not (label in ['micro avg', 'macro avg', 'weighted avg']):
+                precision[label] = data['precision']
+        return precision
