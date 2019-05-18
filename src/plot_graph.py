@@ -49,9 +49,19 @@ def plot_graphs(files_name, metrics_name):
         plot_graph(files_name, metric_name)
 
 
+def print_table_best_metrics(files_name):
+    for file_name in files_name:
+        with open('../data/graphs/{file_name}.json'.format(file_name=file_name), 'r') as myfile:
+            data = myfile.read()
+            json_obj = json.loads(data)
+
+            print(file_name.replace('_',' ').replace('-',' ').title(), json_obj["test_loss_best"], sep=',')
+
+
 # Plot all graphs
 graphs_metrics = ["valid_loss_graph", "test_loss_graph", "valid_precision_graph", "test_precision_graph"]
 files = ["logistic-negative_log_likelihood",
          ]
 
 plot_graphs(files, graphs_metrics)
+print_table_best_metrics(files)
