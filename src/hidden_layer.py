@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 class HiddenLayer:
 
-    def __init__(self, layer_input, n_in, n_out, random_generator, W=None, b=None, activation=T.tanh, name=None):
+    def __init__(self, layer_input, n_in, n_out, random_generator, W=None, b=None, activation=T.tanh, name=None, last_layer=False):
         """ Cria uma camada escondida genérica
 
         :type layer_input: theano.tensor.TensorType
@@ -31,14 +31,20 @@ class HiddenLayer:
 
         # Initialize with random values the weights W as a matrix of shape (n_in, n_out)
         if W is None:
-            W_values = np.asarray(
-                random_generator.uniform(
-                    low=-6/(n_in+n_out),
-                    high=6/(n_in+n_out),
-                    size=(n_in, n_out)
-                ),
-                dtype=theano.config.floatX
-            )
+            if last_layer:
+                W_values = np.zeros(
+                    (n_in, n_out),
+                    dtype=theano.config.floatX
+                )
+            else:
+                W_values = np.asarray(
+                    random_generator.uniform(
+                        low=-6/(n_in+n_out),
+                        high=6/(n_in+n_out),
+                        size=(n_in, n_out)
+                    ),
+                    dtype=theano.config.floatX
+                )
 
             # Allocates weight matrix in theano
             W = theano.shared(

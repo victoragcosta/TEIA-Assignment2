@@ -2,6 +2,7 @@ import numpy as np
 from functools import reduce
 import theano
 import theano.tensor as T
+from theano.compile.ops import as_op
 import matplotlib.pyplot as plt
 
 from logistic_regression_layer import *
@@ -30,13 +31,10 @@ class MultilayerPerceptron:
         # The first input is the classifier input
         layer_input = classifier_input
         # Creates pairs of before and after layers neurons counts
-        if last_logistic:
-            pairs = zip(structure[:-2],structure[1:-1])
-        else:
-            pairs = zip(structure[:-1],structure[1:])
+        pairs = zip(structure[:-2],structure[1:-1])
         # Creates all but the last layer
         for count, (layer_count, next_layer_count) in enumerate(pairs):
-            #print(count, '(', layer_count, ',', next_layer_count, ')')
+            # print(count, '(', layer_count, ',', next_layer_count, ')')
             # Creates a layer with the input as the output of the last layer
             new_layer = HiddenLayer(
                 layer_input=layer_input,
@@ -58,8 +56,21 @@ class MultilayerPerceptron:
                 n_out=structure[-1]
             )
             self.layers.append(new_layer)
-        self.output = new_layer.output
+            layer_input = new_layer.output
+        else:
+            new_layer = HiddenLayer(
+                layer_input=layer_input,
+                n_in=structure[-2],
+                n_out=structure[-1],
+                random_generator=random_generator,
+                name='out'
+            )
+            self.layers.append(new_layer)
+            layer_input = new_layer.output
+        self.output = layer_input
         self.y_prediction = T.argmax(self.output, axis=1)
+
+        # theano.printing.pydotprint(self.output, outfile="logreg_pydotprint_prediction.png", var_with_name_simple=True)
 
         self.L1 = reduce(
             lambda a, b: a+b,
@@ -82,7 +93,7 @@ class MultilayerPerceptron:
         return -T.mean(T.log(self.output)[T.arange(y.shape[0]), y])
 
     def mean_squared_error(self, y):
-        return T.mean(T.sqr(y-self.output[T.arange(y.shape[0]), y]))
+        return T.mean((y-self.output) ** 2)
 
     def errors(self, y):
         """ Retorna um float representando a porcentagem de erros da minibatela

@@ -12,7 +12,7 @@ from multilayer_perceptron import *
 
 class MultilayerPerceptronClassifier:
 
-    def __init__(self, structure, seed=1234, learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000, batch_size=20, last_logistic=False, cost_function=None, early_stopping=False):
+    def __init__(self, structure, seed=1234, learning_rate=0.01, L1_reg=0.0, L2_reg=0.0, n_epochs=1000, batch_size=20, last_logistic=False, cost_function=None, early_stopping=False):
         """ Constrói modelo e treina o modelo
 
         :type structure: tuple
