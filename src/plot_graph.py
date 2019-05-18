@@ -50,6 +50,9 @@ def plot_graphs(files_name, metrics_name):
 
 
 def print_table_best_metrics(files_name):
+
+    print('Method name', 'Best Loss', sep=',')
+
     for file_name in files_name:
         with open('../data/graphs/{file_name}.json'.format(file_name=file_name), 'r') as myfile:
             data = myfile.read()
